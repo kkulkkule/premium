@@ -1,0 +1,209 @@
+Msg("##############################\n")
+Msg("## Loading Premium Module   ##\n")
+Msg("## shared.lua               ##\n")
+include("shared.lua")
+-- Msg("## sv_checkpm.lua           ##\n")
+-- include("sv_checkpm.lua")
+Msg("## Complete!                ##\n")
+Msg("##############################\n")
+
+resource.AddFile("materials/hspremium/text.vmt")
+
+util.AddNetworkString("hspremium_broadcast")
+util.AddNetworkString("hspremium_remain")
+
+FindMetaTable("File").WriteLine = function(self, data)
+	self:Write(data .. "\n")
+end
+
+FindMetaTable("Player").SetPremium = function(self)
+	self:SetNetworkedVar("hspremium", true)
+end
+
+HSPremium = HSPremium or {}
+
+-- Get premium file path
+function HSPremium.GetPath(pl)
+	if !IsValid(pl) then
+		return false
+	end
+	return "hspremium/" .. pl:UniqueID() .. ".txt"
+end
+
+-- Is premium file exists?
+function HSPremium.Exists(pl)
+	if !file.Exists(HSPremium.GetPath(pl), "DATA") then
+		return false
+	end
+	return true
+end
+
+-- Get keys and values
+function HSPremium.GetKeyValue(pl)
+	return HSPremium.GetKeyValueByUID(pl:UniqueID())
+end
+
+-- Get keys and values by UniqueID
+function HSPremium.GetKeyValueByUID(uid)
+	local path = "hspremium/" .. uid .. ".txt"
+	if !file.Exists(path, "DATA") then
+		return false
+	end
+	local f = file.Open(path, "r", "DATA")
+	local value = {}
+	local str = nil
+	local count = 0
+	repeat
+		str = f:Read(1)
+		if str and string.match(str, "%s") == nil then
+			local key = {}
+			repeat
+				key[count + 1] = (key[count + 1] or "") .. (!string.match(str, "%s") and str or "")
+				str = f:Read(1)
+			until !str or str == ":"
+			str = f:Read(1)
+			repeat
+				value[key[count + 1]] = (value[key[count + 1]] or "") .. (!string.match(str, "%s") and str or "")
+				str = f:Read(1)
+			until !str or string.match(str, "\n") ~= nil
+			count = count + 1
+		end
+	until str == nil
+	f:Close()
+	
+	return value
+end
+
+-- Get start time
+function HSPremium.GetStartTime(pl)
+	return tonumber(HSPremium.GetKeyValue(pl).start)
+end
+
+-- Get end time
+function HSPremium.GetEndTime(pl)
+	return tonumber(HSPremium.GetKeyValue(pl).endday)
+end
+
+-- Check player's premium is valid
+function HSPremium.Valid(pl)
+	if !HSPremium.Exists(pl) then
+		return false
+	end
+
+	local value = HSPremium.GetKeyValue(pl)
+	if !value then
+		return false
+	end
+	
+	if tonumber(value.endday) <= tonumber(os.time()) then
+		file.Delete(HSPremium.GetPath(pl))
+		return false
+	end
+	
+	return (value.nick and value.start and value.endday) and true or false
+end
+
+-- Set player premium
+function HSPremium.SetPremium(pl, time)
+	if HSPremium.Valid(pl) then
+		return false
+	end
+	local nick = pl:Nick()
+	local today = os.time()
+	local f = file.Open(HSPremium.GetPath(pl), "w", "DATA")
+	f:Write(
+		"nick: " .. nick .. "\n" ..
+		"start: " .. today .. "\n" ..
+		"endday: " .. time + os.time() .. "\n"
+	)
+	f:Close()
+end
+
+-- Change player's premium info
+function HSPremium.ChangeInfo(pl, info)
+	if !HSPremium.Valid(pl) then
+		return
+	end
+	local f = file.Open(HSPremium.GetPath(pl), "w", "DATA")
+	f:Write(
+	"nick: " .. info.nick .. "\n" ..
+	"start: " .. info.start .. "\n" ..
+	"endday: " .. info.endday .. "\n"
+	)
+	f:Close()
+end
+
+-- If nick was changed, return current nick
+function HSPremium.ChangedNickInfo(pl)
+	local info = HSPremium.GetKeyValue(pl)
+	if !info then
+		return false
+	end
+	local nick = pl:Nick()
+	if info.nick ~= nick then
+		info.nick = nick
+		return info
+	end
+	return false
+end
+
+-- Process when player initialize spawn
+function HSPremium.InitializeSpawn(pl)
+	if HSPremium.Valid(pl) then
+		pl:SetPremium()
+	end
+	local info = HSPremium.ChangedNickInfo(pl)
+	if info then
+		HSPremium.ChangeInfo(pl, info)
+	end
+end
+hook.Add("PlayerInitialSpawn", "HSPremiumInit", HSPremium.InitializeSpawn)
+
+-- Processed when superadmin send add premium command
+function HSPremium.AddPremiumCommand(pl, cmd, args, full)
+	if pl ~= NULL and !pl:IsSuperAdmin() then
+		return
+	end
+	if !args[1] or !args[2] or !tonumber(args[2]) then
+		return
+	end
+	local pl = NULL
+	args[1] = string.lower(string.Replace(args[1], "'", ""))
+	for _, v in pairs(player.GetAll()) do
+		if string.find(string.lower(v:Nick()), args[1]) then
+			pl = v
+			break
+		end
+	end
+	if IsValid(pl) then
+		HSPremium.SetPremium(pl, args[2] * 60 * 60 * 24)
+		net.Start("hspremium_broadcast")
+			net.WriteString(pl:Nick())
+			net.WriteFloat(args[2])
+		net.Broadcast()
+	end
+end
+concommand.Add("hsp_addpremium", HSPremium.AddPremiumCommand)
+
+-- Processed when player send remain command
+function HSPremium.RemainCommand(pl, cmd, args, full)
+	if pl == NULL then
+		print("Console can't execute this command.")
+		return
+	end
+	
+	local ispremium = HSPremium.Valid(pl)
+	
+	if !ispremium then
+		net.Start("hspremium_remain")
+			net.WriteBit(ispremium)
+		net.Send(pl)
+		return
+	end
+	net.Start("hspremium_remain")
+		net.WriteBit(ispremium)
+		net.WriteFloat(HSPremium.GetEndTime(pl))
+	net.Send(pl)
+	
+end
+concommand.Add("hsp_remain", HSPremium.RemainCommand)

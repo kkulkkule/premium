@@ -1,0 +1,11 @@
+"AddonInfo"
+{
+	"name"			"Honsal Premium"
+	"version"		"1.00"
+	"up_date"		"2014/04/16"
+	"author_name"		"[KOR]È¥»ì"
+	"author_email"		"honjasalayo@gmail.com"
+	"author_url"		"http://honsal.tistory.com"
+	"info"			"Set user premium"
+	"override"		"0"
+}
