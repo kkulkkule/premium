@@ -6,6 +6,6 @@
 	"author_name"		"[KOR]È¥»ì"
 	"author_email"		"honjasalayo@gmail.com"
 	"author_url"		"http://honsal.tistory.com"
-	"info"			"Honsal's Zombie Survival Premium Module"
+	"info"			"Set user premium"
 	"override"		"0"
 }
