@@ -131,7 +131,7 @@ hook.Add("HUDPaint", "HSPremiumShowHUD", HSPremium.ShowHUD)
 local lastCheck = 0
 function HSPremium.CheckPremium()
 	if lastCheck + 10 <= CurTime() then
-		if LocalPlayer():GetNetworkedVar("hspremium") then
+		if LocalPlayer():GetNWBool("hspremium") then
 			HSPremium.IsPremium = true
 		else
 			HSPremium.IsPremium = false

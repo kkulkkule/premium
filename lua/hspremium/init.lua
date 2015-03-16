@@ -19,11 +19,11 @@ util.AddNetworkString("hspremium_updateinfo")
 util.AddNetworkString("hspremium_request")
 
 FindMetaTable("Player").SetPremium = function(self, set)
-	self:SetNetworkedVar("hspremium", set)
+	self:SetNWBool("hspremium", set)
 end
 
 FindMetaTable("Player").GetPremium = function(self)
-	return self:GetNetworkedVar("hspremium")
+	return self:GetNWBool("hspremium")
 end
 
 HSPremium = HSPremium or {}
